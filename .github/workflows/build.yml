@@ -16,20 +16,27 @@ jobs:
           echo "Usando: $f"
           if [ -z "$f" ]; then echo "ERRO: não achei o zip do projeto na raiz do repositório"; ls -la; exit 1; fi
           unzip -q "$f" -d projeto
+      - name: Descobrir qual Python o Chaquopy oferece com OpenCV para Android
+        id: pick
+        run: |
+          curl -fsSL https://chaquo.com/pypi-13.1/opencv-python-headless/ -o idx.html || { echo "ERRO: não consegui abrir o catálogo do Chaquopy"; exit 1; }
+          grep -o 'opencv_python_headless-[^"<>]*arm64_v8a[^"<>]*\.whl' idx.html | sort -u > wheels.txt || true
+          echo "=== OpenCV para Android (arm64) disponível no Chaquopy ==="
+          cat wheels.txt
+          if [ ! -s wheels.txt ]; then echo "ERRO: nenhuma versão do OpenCV para Android no catálogo"; head -c 1500 idx.html; exit 1; fi
+          minor=$(grep -o -- '-cp3[0-9]*-' wheels.txt | sed 's/-cp3//; s/-//' | sort -n | tail -1)
+          echo "Python escolhido: 3.$minor"
+          echo "pyver=3.$minor" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-      - name: Mandar o Chaquopy usar o Python 3.11
+          python-version: ${{ steps.pick.outputs.pyver }}
+      - name: Ajustar o projeto para esse Python
         run: |
-          sed -i 's|version "3.11"|version "3.11"\n        buildPython "python3.11"|' projeto/app/build.gradle
-          grep -n "buildPython" projeto/app/build.gradle
-          python3.11 --version
-      - name: Pacotes Python (só versões prontas para Android)
-        run: |
+          py=${{ steps.pick.outputs.pyver }}
+          sed -i "s|version \"3.11\"|version \"$py\"\n        buildPython \"python$py\"|" projeto/app/build.gradle
           sed -i 's|install "opencv-python-headless".*|options "--only-binary=:all:"\n            install "opencv-python-headless"|' projeto/app/build.gradle
           sed -n '/chaquopy {/,/^}/p' projeto/app/build.gradle
-          echo "--- opencv disponível no repositório do Chaquopy:"
-          curl -s https://chaquo.com/pypi-13.1/opencv-python-headless/ | grep -o 'opencv_python_headless[^"<>]*arm64_v8a[^"<>]*' | sort -u | head -40 || true
+          python$py --version
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
