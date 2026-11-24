@@ -16,6 +16,14 @@ jobs:
           echo "Usando: $f"
           if [ -z "$f" ]; then echo "ERRO: não achei o zip do projeto na raiz do repositório"; ls -la; exit 1; fi
           unzip -q "$f" -d projeto
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Mandar o Chaquopy usar o Python 3.11
+        run: |
+          sed -i 's|version "3.11"|version "3.11"\n        buildPython "python3.11"|' projeto/app/build.gradle
+          grep -n "buildPython" projeto/app/build.gradle
+          python3.11 --version
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
