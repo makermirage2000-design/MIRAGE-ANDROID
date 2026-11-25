@@ -49,17 +49,18 @@ jobs:
           else
             echo "Não está no Maven Central; tentando o JitPack"
             curl -fsSL https://jitpack.io/api/builds/com.github.adaptech-cz/Tesseract4Android -o jp.json || { echo "ERRO: nem Maven Central nem JitPack responderam"; exit 1; }
-            v=$(grep -o '"[0-9][0-9.]*" *: *"ok"' jp.json | sed 's/[" ]//g; s/:ok//' | sort -V | tail -1)
-            echo "Versões prontas no JitPack:"; grep -o '"[0-9][0-9.]*" *: *"ok"' jp.json | sed 's/[" ]//g; s/:ok//' | sort -V | tr '\n' ' '; echo
-            if [ -z "$v" ]; then echo "ERRO: nenhuma versão utilizável no JitPack"; head -c 600 jp.json; exit 1; fi
-            coord=""
-            for opt in "com.github.adaptech-cz.Tesseract4Android:tesseract4android|com/github/adaptech-cz/Tesseract4Android/tesseract4android/$v/tesseract4android-$v.pom" "com.github.adaptech-cz:Tesseract4Android|com/github/adaptech-cz/Tesseract4Android/$v/Tesseract4Android-$v.pom"; do
-              c=${opt%%|*}; path=${opt##*|}
-              code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 300 "https://jitpack.io/$path")
-              echo "$c:$v -> HTTP $code"
-              if [ "$code" = "200" ]; then coord="$c"; break; fi
+            echo "Versões prontas no JitPack:"; grep -o '"[0-9][0-9.]*" *: *"ok"' jp.json | sed 's/[" ]//g; s/:ok//' | tr '\n' ' '; echo
+            coord=""; v=""
+            for ver in 4.6.0 4.5.0 4.4.0 4.8.0 4.3.0; do
+              if ! grep -q "\"$ver\" *: *\"ok\"" jp.json; then echo "$ver: não está pronta no JitPack"; continue; fi
+              for opt in "com.github.adaptech-cz.Tesseract4Android:tesseract4android|com/github/adaptech-cz/Tesseract4Android/tesseract4android/$ver/tesseract4android-$ver.pom" "com.github.adaptech-cz:Tesseract4Android|com/github/adaptech-cz/Tesseract4Android/$ver/Tesseract4Android-$ver.pom"; do
+                c=${opt%%|*}; path=${opt##*|}
+                code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 300 "https://jitpack.io/$path")
+                echo "$c:$ver -> HTTP $code"
+                if [ "$code" = "200" ]; then coord="$c"; v="$ver"; break 2; fi
+              done
             done
-            if [ -z "$coord" ]; then echo "ERRO: a versão $v não está disponível no JitPack em nenhum dos endereços"; exit 1; fi
+            if [ -z "$coord" ]; then echo "ERRO: nenhuma versão do Tesseract4Android disponível no JitPack"; exit 1; fi
             echo "Usando $coord:$v (JitPack)"
             sed -i "s|'cz.adaptech.tesseract4android:tesseract4android:[0-9.]*'|'$coord:$v'|" projeto/app/build.gradle
             sed -i 's|maven { url "https://chaquo.com/maven" }|maven { url "https://chaquo.com/maven" }\n        maven { url "https://jitpack.io" }|' projeto/settings.gradle
