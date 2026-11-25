@@ -37,6 +37,26 @@ jobs:
           sed -i 's|install "opencv-python-headless".*|options "--only-binary=:all:"\n            install "opencv-python-headless"|' projeto/app/build.gradle
           sed -n '/chaquopy {/,/^}/p' projeto/app/build.gradle
           python$py --version
+      - name: Descobrir a versão do Tesseract4Android (OCR) que existe
+        run: |
+          base=https://repo1.maven.org/maven2/cz/adaptech/tesseract4android/tesseract4android
+          if curl -fsSL "$base/maven-metadata.xml" -o meta.xml; then
+            echo "Versões no Maven Central:"; grep -o '<version>[^<]*</version>' meta.xml | sed 's/<[^>]*>//g' | tr '\n' ' '; echo
+            v=$(grep -o '<release>[^<]*</release>' meta.xml | sed 's/<[^>]*>//g')
+            if [ -z "$v" ]; then v=$(grep -o '<version>[^<]*</version>' meta.xml | sed 's/<[^>]*>//g' | tail -1); fi
+            echo "Usando cz.adaptech.tesseract4android:tesseract4android:$v"
+            sed -i "s|cz.adaptech.tesseract4android:tesseract4android:[0-9.]*|cz.adaptech.tesseract4android:tesseract4android:$v|" projeto/app/build.gradle
+          else
+            echo "Não está no Maven Central; tentando o JitPack"
+            curl -fsSL https://jitpack.io/api/builds/com.github.adaptech-cz/Tesseract4Android -o jp.json || { echo "ERRO: nem Maven Central nem JitPack responderam"; exit 1; }
+            head -c 600 jp.json; echo
+            v=$(grep -o '"[0-9][0-9.]*":"ok"' jp.json | sed 's/"//g; s/:ok//' | sort -V | tail -1)
+            if [ -z "$v" ]; then echo "ERRO: nenhuma versão utilizável no JitPack"; exit 1; fi
+            echo "Usando com.github.adaptech-cz:Tesseract4Android:$v (JitPack)"
+            sed -i "s|'cz.adaptech.tesseract4android:tesseract4android:[0-9.]*'|'com.github.adaptech-cz:Tesseract4Android:$v'|" projeto/app/build.gradle
+            sed -i 's|maven { url "https://chaquo.com/maven" }|maven { url "https://chaquo.com/maven" }\n        maven { url "https://jitpack.io" }|' projeto/settings.gradle
+          fi
+          grep -n -i tesseract projeto/app/build.gradle
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
